@@ -37,7 +37,10 @@ contract LiquidStaking is Ownable {
         external
         onlyOwner
     {
-        _require(_amount <= stakedEla, Errors.WITHDRAW_STAKED_ELA_NOT_ENOUGH_AMOUNT);
+        _require(
+            _amount <= stakedEla,
+            Errors.WITHDRAW_STAKED_ELA_NOT_ENOUGH_AMOUNT
+        );
         stakedEla -= _amount;
 
         // solhint-disable-next-line avoid-low-level-calls
