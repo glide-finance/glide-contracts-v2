@@ -62,11 +62,13 @@ contract LiquidStaking is Ownable {
     }
 
     function getUpdateEpochAmount() external view returns (uint256) {
-        return totalWithdrawRequested - totalElaAmountForWithdraw;
+        return
+            (totalWithdrawRequested - totalElaAmountForWithdraw) /
+            (exchangeRate / _EXCHANGE_RATE_DIVIDER);
     }
 
     function deposit(address _stElaReceiver) external payable {
-        uint256 amountOut = (msg.value * exchangeRate) / _EXCHANGE_RATE_DIVIDER;
+        uint256 amountOut = msg.value * (exchangeRate / _EXCHANGE_RATE_DIVIDER);
         crossChainPayload.receivePayload{value: amountOut}(
             receivePayloadAddress,
             amountOut,
