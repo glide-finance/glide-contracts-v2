@@ -95,8 +95,6 @@ function _revert(uint256 errorCode) pure {
 library Errors {
     // Liquid Staking
     uint256 internal constant UPDATE_EPOCH = 1;
-    uint256 internal constant WITHDRAW_STAKED_ELA_NOT_ENOUGH_AMOUNT = 2;
-    uint256 internal constant WITHDRAW_STAKED_ELA_TRANSFER_NOT_SUCCEESS = 3;
     uint256 internal constant REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT = 4;
     uint256 internal constant WITHDRAW_NOT_ENOUGH_AMOUNT = 5;
     uint256 internal constant WITHDRAW_TRANSFER_NOT_SUCCEESS = 6;

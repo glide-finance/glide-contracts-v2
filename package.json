@@ -14,7 +14,8 @@
     "solhint": "solhint \"contracts/**/*.sol\"",
     "lint": "prettier --write \"contracts/**/*.sol\"",
     "lint-check": "prettier --check \"contracts/**/*.sol\"",
-    "start-local": "npx hardhat node"
+    "start-local": "npx hardhat node",
+    "deploy-elastos": "npx hardhat run scripts/deploy.ts --network elastos"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.5",

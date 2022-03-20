@@ -1,59 +1,77 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
-import "../Helpers/GlideErrors.sol";
 import "./StElaToken.sol";
+import "./interfaces/ICrossChainPayload.sol";
+import "../Helpers/GlideErrors.sol";
 
 contract LiquidStaking is Ownable {
-    StElaToken private stEla;
+    uint256 private constant _EXCHANGE_RATE_DIVIDER = 10000;
+    StElaToken private immutable stEla;
+    ICrossChainPayload private immutable crossChainPayload;
 
-    uint256 public stakedEla;
+    string private receivePayloadAddress;
+    uint256 private receivePayloadFee;
+
     uint256 public exchangeRate;
     uint256 public currentEpoch;
     uint256 public totalWithdrawRequested;
+    uint256 public epochTotalWithdrawRequested;
+    uint256 public totalElaAmountForWithdraw;
 
     struct WithrawRequest {
-        uint256 elaAmount;
+        uint256 stElaAmount;
         uint256 epoch;
     }
 
-    mapping(address => WithrawRequest) private withdrawRequests;
-    mapping(address => uint256) private withdrawAmounts;
+    mapping(address => WithrawRequest) public withdrawRequests;
+    mapping(address => uint256) public withdrawForExecute;
 
-    constructor(StElaToken _stEla) {
+    constructor(StElaToken _stEla, ICrossChainPayload _crossChainPayload) {
         stEla = _stEla;
-        exchangeRate = 1;
+        crossChainPayload = _crossChainPayload;
+        exchangeRate = _EXCHANGE_RATE_DIVIDER;
         currentEpoch = 1;
     }
 
-    function updateEpoch(uint256 _exchangeRate) external payable onlyOwner {
-        _require(totalWithdrawRequested == msg.value, Errors.UPDATE_EPOCH);
-        exchangeRate = _exchangeRate;
-        currentEpoch += 1;
-        totalWithdrawRequested = 0;
+    receive() external payable {
+        totalElaAmountForWithdraw += msg.value;
     }
 
-    function withdrawStakedEla(uint256 _amount, address _receiver)
+    function setReceivePayloadAddress(string memory _receivePayloadAddress)
         external
+        payable
         onlyOwner
     {
-        _require(
-            _amount <= stakedEla,
-            Errors.WITHDRAW_STAKED_ELA_NOT_ENOUGH_AMOUNT
-        );
-        stakedEla -= _amount;
+        receivePayloadAddress = _receivePayloadAddress;
+    }
 
-        // solhint-disable-next-line avoid-low-level-calls
-        (bool successTransfer, ) = payable(_receiver).call{value: _amount}("");
-        _require(
-            successTransfer,
-            Errors.WITHDRAW_STAKED_ELA_TRANSFER_NOT_SUCCEESS
-        );
+    function setReceivePayloadFee(uint256 _receivePayloadFee)
+        external
+        payable
+        onlyOwner
+    {
+        receivePayloadFee = _receivePayloadFee;
+    }
+
+    function updateEpoch(uint256 _exchangeRate) external onlyOwner {
+        totalWithdrawRequested += epochTotalWithdrawRequested;
+        epochTotalWithdrawRequested = 0;
+        currentEpoch += 1;
+        exchangeRate = _exchangeRate;
+    }
+
+    function getUpdateEpochAmount() external view returns (uint256) {
+        return totalWithdrawRequested - totalElaAmountForWithdraw;
     }
 
     function deposit(address _stElaReceiver) external payable {
-        stakedEla += msg.value;
-        uint256 amountOut = msg.value * exchangeRate;
+        uint256 amountOut = (msg.value * exchangeRate) / _EXCHANGE_RATE_DIVIDER;
+        crossChainPayload.receivePayload{value: amountOut}(
+            receivePayloadAddress,
+            amountOut,
+            receivePayloadFee
+        );
         stEla.mint(_stElaReceiver, amountOut);
     }
 
@@ -62,38 +80,47 @@ contract LiquidStaking is Ownable {
             _amount <= stEla.balanceOf(msg.sender),
             Errors.REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT
         );
-        stEla.burn(msg.sender, _amount);
 
         if (
-            withdrawRequests[msg.sender].elaAmount > 0 &&
+            withdrawRequests[msg.sender].stElaAmount > 0 &&
             withdrawRequests[msg.sender].epoch < currentEpoch
         ) {
-            withdrawAmounts[msg.sender] += withdrawRequests[msg.sender]
-                .elaAmount;
-            withdrawRequests[msg.sender].elaAmount = 0;
+            withdrawForExecute[msg.sender] += withdrawRequests[msg.sender]
+                .stElaAmount;
+            withdrawRequests[msg.sender].stElaAmount = 0;
         }
-
-        uint256 receiveElaAmount = _amount / exchangeRate;
-        totalWithdrawRequested += receiveElaAmount;
-        withdrawRequests[msg.sender].elaAmount += receiveElaAmount;
+        withdrawRequests[msg.sender].stElaAmount += _amount;
         withdrawRequests[msg.sender].epoch = currentEpoch;
+
+        epochTotalWithdrawRequested += _amount;
+
+        stEla.transfer(address(this), _amount);
     }
 
     function withdraw(uint256 _amount, address _receiver) external {
         if (withdrawRequests[msg.sender].epoch < currentEpoch) {
-            withdrawAmounts[msg.sender] += withdrawRequests[msg.sender]
-                .elaAmount;
-            withdrawRequests[msg.sender].elaAmount = 0;
+            withdrawForExecute[msg.sender] += withdrawRequests[msg.sender]
+                .stElaAmount;
+            withdrawRequests[msg.sender].stElaAmount = 0;
         }
 
         _require(
-            _amount <= withdrawAmounts[msg.sender],
+            _amount <= withdrawForExecute[msg.sender],
             Errors.WITHDRAW_NOT_ENOUGH_AMOUNT
         );
-        withdrawAmounts[msg.sender] -= _amount;
+        withdrawForExecute[msg.sender] -= _amount;
+
+        uint256 elaAmount = _amount / (exchangeRate / _EXCHANGE_RATE_DIVIDER);
+
+        totalWithdrawRequested -= _amount;
+        totalElaAmountForWithdraw -= elaAmount;
 
         // solhint-disable-next-line avoid-low-level-calls
-        (bool successTransfer, ) = payable(_receiver).call{value: _amount}("");
+        (bool successTransfer, ) = payable(_receiver).call{value: elaAmount}(
+            ""
+        );
         _require(successTransfer, Errors.WITHDRAW_TRANSFER_NOT_SUCCEESS);
+
+        stEla.burn(address(this), _amount);
     }
 }
