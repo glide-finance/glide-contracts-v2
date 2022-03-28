@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 import { Contract } from "ethers";
 
-export abstract class ContractBase
+export abstract class BaseContract
 {
   contract:Contract;
   address:string;

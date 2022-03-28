@@ -52,16 +52,16 @@ function _revert(uint256 errorCode) pure {
         let hundreds := add(mod(errorCode, 10), 0x30)
 
         // With the individual characters, we can now construct the full string. The "GLIDE#" part is a known constant
-        // (0x474c4944452300): we simply shift this by 24 (to provide space for the 3 bytes of the error code), and add the
+        // (0x474c49444523): we simply shift this by 24 (to provide space for the 3 bytes of the error code), and add the
         // characters to it, each shifted by a multiple of 8.
         // The revert reason is then shifted left by 200 bits (256 minus the length of the string, 7 characters * 8 bits
         // per character = 56) to locate it in the most significant part of the 256 slot (the beginning of a byte
         // array).
 
         let revertReason := shl(
-            200,
+            184,
             add(
-                0x474c4944452300,
+                0x474c49444523000000,
                 add(add(units, shl(8, tenths)), shl(16, hundreds))
             )
         )
@@ -82,7 +82,7 @@ function _revert(uint256 errorCode) pure {
             0x0000000000000000000000000000000000000000000000000000000000000020
         )
         // The string length is fixed: 7 characters.
-        mstore(0x24, 7)
+        mstore(0x24, 9)
         // Finally, the string itself is stored.
         mstore(0x44, revertReason)
 
@@ -94,8 +94,11 @@ function _revert(uint256 errorCode) pure {
 
 library Errors {
     // Liquid Staking
-    uint256 internal constant UPDATE_EPOCH = 1;
-    uint256 internal constant REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT = 4;
-    uint256 internal constant WITHDRAW_NOT_ENOUGH_AMOUNT = 5;
-    uint256 internal constant WITHDRAW_TRANSFER_NOT_SUCCEESS = 6;
+    uint256 internal constant UPDATE_EPOCH_NO_ENOUGH_ELA = 101;
+    uint256 internal constant RECEIVE_PAYLOAD_ADDRESS_ZERO = 102;
+    uint256 internal constant REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT = 103;
+    uint256 internal constant WITHDRAW_NOT_ENOUGH_AMOUNT = 104;
+    uint256 internal constant WITHDRAW_TRANSFER_NOT_SUCCEESS = 105;
+    uint256 internal constant SET_STELA_TRANSFER_OWNER = 106;
+    uint256 internal constant TRANSFER_STELA_OWNERSHIP = 107;
 }
