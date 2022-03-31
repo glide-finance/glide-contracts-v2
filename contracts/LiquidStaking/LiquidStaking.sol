@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.12;
+pragma solidity ^0.6.12;
 
 import "./StElaToken.sol";
 import "./interfaces/ICrossChainPayload.sol";
-import "../Helpers/GlideErrors.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 
 contract LiquidStaking is Ownable {
+    using SafeMath for uint256;
+
     uint256 private constant _EXCHANGE_RATE_DIVIDER = 10000;
     StElaToken private immutable stEla;
     ICrossChainPayload private immutable crossChainPayload;
@@ -37,7 +39,7 @@ contract LiquidStaking is Ownable {
     mapping(address => WithrawRequest) public withdrawRequests;
     mapping(address => WithdrawForExecute) public withdrawForExecutes;
 
-    constructor(StElaToken _stEla, ICrossChainPayload _crossChainPayload) {
+    constructor(StElaToken _stEla, ICrossChainPayload _crossChainPayload) public {
         stEla = _stEla;
         crossChainPayload = _crossChainPayload;
         exchangeRate = _EXCHANGE_RATE_DIVIDER;
@@ -46,7 +48,7 @@ contract LiquidStaking is Ownable {
     }
 
     receive() external payable {
-        totalElaAmountForWithdraw += msg.value;
+        totalElaAmountForWithdraw = totalElaAmountForWithdraw.add(msg.value);
         prevTotalElaAmountForWithdraw = totalElaAmountForWithdraw;
     }
 
@@ -73,10 +75,10 @@ contract LiquidStaking is Ownable {
     /// @dev First step for update epoch (before amount send to contract)
     /// @param _exchangeRate Exchange rate 
     function updateEpochFirstStep(uint256 _exchangeRate) external onlyOwner {
-        totalWithdrawRequested += stElaEpochTotalWithdrawRequested;
+        totalWithdrawRequested = totalWithdrawRequested.add(stElaEpochTotalWithdrawRequested);
         prevStElaEpochTotalWithdrawRequested = totalWithdrawRequested;
         stElaEpochTotalWithdrawRequested = 0;
-        currentEpoch += 1;
+        currentEpoch = currentEpoch.add(1);
         exchangeRate = _exchangeRate;
         onHold = true;
     }
@@ -87,9 +89,9 @@ contract LiquidStaking is Ownable {
             prevStElaEpochTotalWithdrawRequested
         );
 
-        _require(
+        require(
             prevTotalElaAmountForWithdraw == prevEpochElaForWithdraw,
-            Errors.UPDATE_EPOCH_NO_ENOUGH_ELA
+            "UPDATE_EPOCH_NO_ENOUGH_ELA"
         );
         prevStElaEpochTotalWithdrawRequested = 0;
         prevTotalElaAmountForWithdraw = 0;
@@ -100,16 +102,15 @@ contract LiquidStaking is Ownable {
     /// @return uint256 Amount that is needed to be provided before updateEpochSecondStep
     function getUpdateEpochAmount() external view returns (uint256) {
         return
-            _getElaAmountForWithdraw(prevStElaEpochTotalWithdrawRequested) -
-            prevTotalElaAmountForWithdraw;
+            _getElaAmountForWithdraw(prevStElaEpochTotalWithdrawRequested).sub(prevTotalElaAmountForWithdraw);
     }
 
     /// @dev Deposit ELA amount and get stEla token
     /// @param _stElaReceiver Receiver for stEla token
     function deposit(address _stElaReceiver) external payable {
-        _require(
+        require(
             bytes(receivePayloadAddress).length != 0,
-            Errors.RECEIVE_PAYLOAD_ADDRESS_ZERO
+            "RECEIVE_PAYLOAD_ADDRESS_ZERO"
         );
 
         crossChainPayload.receivePayload{value: msg.value}(
@@ -118,24 +119,24 @@ contract LiquidStaking is Ownable {
             receivePayloadFee
         );
 
-        uint256 amountOut = (msg.value * exchangeRate) / _EXCHANGE_RATE_DIVIDER;
+        uint256 amountOut = (msg.value.mul(exchangeRate)).div(_EXCHANGE_RATE_DIVIDER);
         stEla.mint(_stElaReceiver, amountOut);
     }
 
     /// @dev Request withdraw stEla amount and get ELA
     /// @param _amount stEla amount that user requested to withdraw
     function requestWithdraw(uint256 _amount) external {
-        _require(
+        require(
             _amount <= stEla.balanceOf(msg.sender),
-            Errors.REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT
+            "REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT"
         );
 
         _withdrawRequestToExecuteTransfer();
 
-        withdrawRequests[msg.sender].stElaAmount += _amount;
+        withdrawRequests[msg.sender].stElaAmount = withdrawRequests[msg.sender].stElaAmount.add(_amount);
         withdrawRequests[msg.sender].epoch = currentEpoch;
 
-        stElaEpochTotalWithdrawRequested += _amount;
+        stElaEpochTotalWithdrawRequested = stElaEpochTotalWithdrawRequested.add(_amount);
 
         stEla.transferFrom(msg.sender, address(this), _amount);
     }
@@ -148,45 +149,44 @@ contract LiquidStaking is Ownable {
 
         if (!onHold) {
             if (withdrawForExecutes[msg.sender].stElaOnHoldAmount > 0) {
-                withdrawForExecutes[msg.sender]
-                    .stElaAmount += withdrawForExecutes[msg.sender]
-                    .stElaOnHoldAmount;
+                withdrawForExecutes[msg.sender].stElaAmount = withdrawForExecutes[msg.sender]
+                    .stElaAmount.add(withdrawForExecutes[msg.sender].stElaOnHoldAmount);
                 withdrawForExecutes[msg.sender].stElaOnHoldAmount = 0;
             }
         }
 
-        _require(
+        require(
             _amount <= withdrawForExecutes[msg.sender].stElaAmount,
-            Errors.WITHDRAW_NOT_ENOUGH_AMOUNT
+            "WITHDRAW_NOT_ENOUGH_AMOUNT"
         );
-        withdrawForExecutes[msg.sender].stElaAmount -= _amount;
+        withdrawForExecutes[msg.sender].stElaAmount = withdrawForExecutes[msg.sender].stElaAmount.sub(_amount);
 
         uint256 elaAmount = _getElaAmountForWithdraw(_amount);
 
-        totalWithdrawRequested -= _amount;
-        totalElaAmountForWithdraw -= elaAmount;
+        totalWithdrawRequested = totalWithdrawRequested.sub(_amount);
+        totalElaAmountForWithdraw = totalElaAmountForWithdraw.sub(elaAmount);
 
         // solhint-disable-next-line avoid-low-level-calls
         (bool successTransfer, ) = payable(_receiver).call{value: elaAmount}(
             ""
         );
-        _require(successTransfer, Errors.WITHDRAW_TRANSFER_NOT_SUCCEESS);
+        require(successTransfer, "WITHDRAW_TRANSFER_NOT_SUCCEESS");
 
         stEla.burn(address(this), _amount);
     }
 
     function setStElaTransferOwner(address _stElaTransferOwner) external {
-        _require(
+        require(
             msg.sender == stElaTransferOwner,
-            Errors.SET_STELA_TRANSFER_OWNER
+            "SET_STELA_TRANSFER_OWNER"
         );
         stElaTransferOwner = _stElaTransferOwner;
     }
 
     function transferStElaOwnership(address _newOwner) external {
-        _require(
+        require(
             msg.sender == stElaTransferOwner,
-            Errors.TRANSFER_STELA_OWNERSHIP
+            "TRANSFER_STELA_OWNERSHIP"
         );
         stEla.transferOwnership(_newOwner);
     }
@@ -196,7 +196,7 @@ contract LiquidStaking is Ownable {
         view
         returns (uint256)
     {
-        return (_stElaAmount / exchangeRate) * _EXCHANGE_RATE_DIVIDER;
+        return _stElaAmount.div(exchangeRate).mul(_EXCHANGE_RATE_DIVIDER);
     }
 
     function _withdrawRequestToExecuteTransfer() internal {
@@ -205,15 +205,13 @@ contract LiquidStaking is Ownable {
             withdrawRequests[msg.sender].epoch < currentEpoch
         ) {
             if (
-                onHold && currentEpoch - withdrawRequests[msg.sender].epoch == 1
+                onHold && currentEpoch.sub(withdrawRequests[msg.sender].epoch) == 1
             ) {
-                withdrawForExecutes[msg.sender]
-                    .stElaOnHoldAmount += withdrawRequests[msg.sender]
-                    .stElaAmount;
+                withdrawForExecutes[msg.sender].stElaOnHoldAmount = withdrawForExecutes[msg.sender]
+                    .stElaOnHoldAmount.add(withdrawRequests[msg.sender].stElaAmount);
             } else {
-                withdrawForExecutes[msg.sender].stElaAmount += withdrawRequests[
-                    msg.sender
-                ].stElaAmount;
+                withdrawForExecutes[msg.sender].stElaAmount = withdrawForExecutes[msg.sender].stElaAmount.add(withdrawRequests[
+                    msg.sender].stElaAmount);
             }
             withdrawRequests[msg.sender].stElaAmount = 0;
         }
