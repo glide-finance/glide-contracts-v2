@@ -32,15 +32,14 @@ describe("LiquidStaking", function () {
     user1 = signers[1];
     user2 = signers[2];
 
+    const addr = "ELASTOS_ADDRESS";
+
     // Create contracts
     stElaToken = await StElaToken.create();
     crossChainPayloadMock = await CrossChainPayloadMock.create();
-    liquidStaking = await LiquidStaking.create(stElaToken.address, crossChainPayloadMock.address);
+    liquidStaking = await LiquidStaking.create(stElaToken.address, crossChainPayloadMock.address, addr, 0.0001);
   
     await stElaToken.transferOwnership(owner, liquidStaking.address);
-
-    const addr = "ELASTOS_ADDRESS";
-    await liquidStaking.setReceivePayloadAddress(owner, addr);
 
     const amountToDeposit = 1;
     await liquidStaking.depoist(user1, await user1.getAddress(), amountToDeposit);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.12;
+pragma solidity ^0.6.12;
 
 import "./interfaces/IGlidePair.sol";
 import "./GlideERC20.sol";
@@ -82,7 +82,7 @@ contract GlidePair is GlideERC20 {
     );
     event Sync(uint112 reserve0, uint112 reserve1);
 
-    constructor() {
+    constructor() public{
         factory = msg.sender;
     }
 

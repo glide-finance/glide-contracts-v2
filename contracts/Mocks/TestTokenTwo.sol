@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.0;
+pragma solidity >=0.6.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
 contract TestTokenTwo is ERC20, Ownable {
     uint256 private constant preMineSupply = 200000000 * 1e18;
@@ -12,7 +12,7 @@ contract TestTokenTwo is ERC20, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
     EnumerableSet.AddressSet private _minters;
 
-    constructor() ERC20("Test Token TWO", "TSTTWO") {
+    constructor() ERC20("Test Token TWO", "TSTTWO") public {
         _mint(msg.sender, preMineSupply);
     }
 

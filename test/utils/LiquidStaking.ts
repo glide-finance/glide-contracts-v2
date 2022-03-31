@@ -14,9 +14,17 @@ export class LiquidStaking extends BaseContract {
 
   static async create(
     _stElaTokenAddress:string,
-    _crossChainPayloadAddress:string
+    _crossChainPayloadAddress:string,
+    _receivePayloadAddress:string,
+    _receivePayloadFee:number
   ): Promise<LiquidStaking> {
-    return new LiquidStaking(await BaseContract.deployContract("LiquidStaking", _stElaTokenAddress, _crossChainPayloadAddress));
+    return new LiquidStaking(await BaseContract.deployContract(
+      "LiquidStaking", 
+      _stElaTokenAddress, 
+      _crossChainPayloadAddress,
+      _receivePayloadAddress,
+      toWei(_receivePayloadFee)
+    ));
   }
 
   getExchangeRateDivider():number{
