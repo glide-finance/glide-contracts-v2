@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.12;
+pragma solidity ^0.6.12;
 
 import "./interfaces/IGlideERC20.sol";
 import "./libraries/SafeMath.sol";
@@ -20,7 +20,7 @@ contract GlideERC20 is IGlideERC20 {
         0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9;
     mapping(address => uint256) public override nonces;
 
-    constructor() {
+    constructor() public {
         uint256 chainId;
         assembly {
             chainId := 20 //FIXED value for ElaEth network

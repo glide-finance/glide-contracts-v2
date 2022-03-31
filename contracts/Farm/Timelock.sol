@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.12;
+pragma solidity ^0.6.12;
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "../Swap/libraries/SafeMath.sol";
 
@@ -47,7 +47,7 @@ contract Timelock is ReentrancyGuard {
 
     mapping(bytes32 => bool) public queuedTransactions;
 
-    constructor(address admin_, uint256 delay_) {
+    constructor(address admin_, uint256 delay_) public {
         require(
             delay_ >= MINIMUM_DELAY,
             "Timelock::constructor: Delay must exceed minimum delay."

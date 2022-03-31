@@ -4,7 +4,7 @@ pragma solidity >=0.5.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
 contract GlideBond is ERC20("Glide Bond", "GLIDE-BOND"), Ownable {
     uint256 private constant _maxTotalSupply = 100000e18; // 100,000 max supply

@@ -3,7 +3,7 @@ pragma solidity >=0.5.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
 contract TestTokenOne is ERC20, Ownable {
     uint256 private constant preMineSupply = 200000000 * 1e18;
@@ -12,7 +12,7 @@ contract TestTokenOne is ERC20, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
     EnumerableSet.AddressSet private _minters;
 
-    constructor() ERC20("Test Token ONE", "TSTONE") {
+    constructor() ERC20("Test Token ONE", "TSTONE") public {
         _mint(msg.sender, preMineSupply);
     }
 

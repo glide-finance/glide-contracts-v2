@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.12;
+pragma solidity ^0.6.12;
 
 import "./interfaces/IGlideFactory.sol";
 import "./interfaces/IGlideRouter.sol";
@@ -20,7 +20,7 @@ contract GlideRouter is IGlideRouter {
         _;
     }
 
-    constructor(address _factory, address _WETH) {
+    constructor(address _factory, address _WETH) public {
         factory = _factory;
         WETH = _WETH;
     }

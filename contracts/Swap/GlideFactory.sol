@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.12;
+pragma solidity ^0.6.12;
 
 import "./interfaces/IGlideFactory.sol";
 import "./GlidePair.sol";
@@ -18,7 +18,7 @@ contract GlideFactory is IGlideFactory {
     event SetAdminAddress(address indexed caller, address indexed newAddress);
     event SetFeeAddress(address indexed caller, address indexed newAddress);
 
-    constructor(address _feeToSetter) {
+    constructor(address _feeToSetter) public {
         feeToSetter = _feeToSetter;
         initCodeHash = keccak256(
             abi.encodePacked(type(GlidePair).creationCode)
@@ -138,7 +138,7 @@ contract GlideFactory is IGlideFactory {
         uint256 amountIn,
         uint256 reserveIn,
         uint256 reserveOut
-    ) public pure override returns (uint256 amountOut) {
+    ) public view override returns (uint256 amountOut) {
         require(amountIn > 0, "GlideFactory: INSUFFICIENT_INPUT_AMOUNT");
         require(
             reserveIn > 0 && reserveOut > 0,
@@ -155,7 +155,7 @@ contract GlideFactory is IGlideFactory {
         uint256 amountOut,
         uint256 reserveIn,
         uint256 reserveOut
-    ) public pure override returns (uint256 amountIn) {
+    ) public view override returns (uint256 amountIn) {
         require(amountOut > 0, "GlideFactory: INSUFFICIENT_OUTPUT_AMOUNT");
         require(
             reserveIn > 0 && reserveOut > 0,

@@ -3,6 +3,7 @@ pragma solidity ^0.6.12;
 
 import "./StElaToken.sol";
 import "./interfaces/ICrossChainPayload.sol";
+import "../Helpers/GlideErrors.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
 contract LiquidStaking is Ownable {
@@ -39,9 +40,16 @@ contract LiquidStaking is Ownable {
     mapping(address => WithrawRequest) public withdrawRequests;
     mapping(address => WithdrawForExecute) public withdrawForExecutes;
 
-    constructor(StElaToken _stEla, ICrossChainPayload _crossChainPayload) public {
+    constructor(
+        StElaToken _stEla, 
+        ICrossChainPayload _crossChainPayload,
+        string memory _receivePayloadAddress,
+        uint256 _receivePayloadFee
+    ) public {
         stEla = _stEla;
         crossChainPayload = _crossChainPayload;
+        receivePayloadAddress = _receivePayloadAddress;
+        receivePayloadFee = _receivePayloadFee;
         exchangeRate = _EXCHANGE_RATE_DIVIDER;
         currentEpoch = 1;
         stElaTransferOwner = msg.sender;
@@ -89,9 +97,9 @@ contract LiquidStaking is Ownable {
             prevStElaEpochTotalWithdrawRequested
         );
 
-        require(
-            prevTotalElaAmountForWithdraw == prevEpochElaForWithdraw,
-            "UPDATE_EPOCH_NO_ENOUGH_ELA"
+        GlideErrors._require(
+            prevTotalElaAmountForWithdraw >= prevEpochElaForWithdraw,
+            GlideErrors.UPDATE_EPOCH_NO_ENOUGH_ELA
         );
         prevStElaEpochTotalWithdrawRequested = 0;
         prevTotalElaAmountForWithdraw = 0;
@@ -108,9 +116,9 @@ contract LiquidStaking is Ownable {
     /// @dev Deposit ELA amount and get stEla token
     /// @param _stElaReceiver Receiver for stEla token
     function deposit(address _stElaReceiver) external payable {
-        require(
+        GlideErrors._require(
             bytes(receivePayloadAddress).length != 0,
-            "RECEIVE_PAYLOAD_ADDRESS_ZERO"
+            GlideErrors.RECEIVE_PAYLOAD_ADDRESS_ZERO
         );
 
         crossChainPayload.receivePayload{value: msg.value}(
@@ -126,9 +134,9 @@ contract LiquidStaking is Ownable {
     /// @dev Request withdraw stEla amount and get ELA
     /// @param _amount stEla amount that user requested to withdraw
     function requestWithdraw(uint256 _amount) external {
-        require(
+        GlideErrors._require(
             _amount <= stEla.balanceOf(msg.sender),
-            "REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT"
+            GlideErrors.REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT
         );
 
         _withdrawRequestToExecuteTransfer();
@@ -155,9 +163,9 @@ contract LiquidStaking is Ownable {
             }
         }
 
-        require(
+        GlideErrors._require(
             _amount <= withdrawForExecutes[msg.sender].stElaAmount,
-            "WITHDRAW_NOT_ENOUGH_AMOUNT"
+            GlideErrors.WITHDRAW_NOT_ENOUGH_AMOUNT
         );
         withdrawForExecutes[msg.sender].stElaAmount = withdrawForExecutes[msg.sender].stElaAmount.sub(_amount);
 
@@ -170,23 +178,23 @@ contract LiquidStaking is Ownable {
         (bool successTransfer, ) = payable(_receiver).call{value: elaAmount}(
             ""
         );
-        require(successTransfer, "WITHDRAW_TRANSFER_NOT_SUCCEESS");
+        GlideErrors._require(successTransfer, GlideErrors.WITHDRAW_TRANSFER_NOT_SUCCEESS);
 
         stEla.burn(address(this), _amount);
     }
 
     function setStElaTransferOwner(address _stElaTransferOwner) external {
-        require(
+        GlideErrors._require(
             msg.sender == stElaTransferOwner,
-            "SET_STELA_TRANSFER_OWNER"
+            GlideErrors.SET_STELA_TRANSFER_OWNER
         );
         stElaTransferOwner = _stElaTransferOwner;
     }
 
     function transferStElaOwnership(address _newOwner) external {
-        require(
+        GlideErrors._require(
             msg.sender == stElaTransferOwner,
-            "TRANSFER_STELA_OWNERSHIP"
+            GlideErrors.TRANSFER_STELA_OWNERSHIP
         );
         stEla.transferOwnership(_newOwner);
     }
