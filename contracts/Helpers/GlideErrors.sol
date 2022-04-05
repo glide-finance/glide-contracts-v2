@@ -23,6 +23,7 @@ library GlideErrors{
     uint256 internal constant WITHDRAW_TRANSFER_NOT_SUCCEESS = 105;
     uint256 internal constant SET_STELA_TRANSFER_OWNER = 106;
     uint256 internal constant TRANSFER_STELA_OWNERSHIP = 107;
+    uint256 internal constant EXCHANGE_RATE_MUST_BE_GREATER_OR_EQUAL_PREVIOUS = 108;
     
     /**
     * @dev Reverts if `condition` is false, with a revert reason containing `errorCode`. Only codes up to 999 are

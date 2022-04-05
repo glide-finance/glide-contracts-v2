@@ -81,10 +81,11 @@ describe("LiquidStaking", function () {
     const amountToDeposit = 1;
     await liquidStaking.depoist(user1, await user1.getAddress(), amountToDeposit);
 
-    expect(toWei(amountToDeposit).toString()).equal(((await crossChainPayloadMock.getContractBalance()).sub(initialCrossChainPayloadBalance)));
+    expect(+toWei(amountToDeposit)).equal(+((await crossChainPayloadMock.getContractBalance()).sub(initialCrossChainPayloadBalance)));
     
-    const currentStElaTokenBalance = await stElaToken.balanceOf(await user1.getAddress());
-    expect(toWei(amountToDeposit * exchangeRate / liquidStaking.getExchangeRateDivider()).toString()).equal(currentStElaTokenBalance.sub(initialUser1StElaTokenBalance));
+    const currentStElaTokenBalance = +(await stElaToken.balanceOf(await user1.getAddress())).sub(initialUser1StElaTokenBalance);
+
+    expect(+toWei(amountToDeposit * liquidStaking.getExchangeRateDivider() / exchangeRate)).to.be.equal(+currentStElaTokenBalance*1);
   });
 
   it("Check if [requestWithdraw] works good", async function () {
