@@ -16,16 +16,6 @@ describe("LiquidStaking", function () {
   let initialCrossChainPayloadBalance:BigNumber;
   let initialUser1StElaTokenBalance: BigNumber;
 
-  async function updateEpoch(
-    _user:Signer,
-    _exchangeRate:number
-  ): Promise<void> {
-    await liquidStaking.updateEpochFirstStep(_user, _exchangeRate);
-    const updateEpochAmount = await liquidStaking.getUpdateEpochAmount();
-    await _user.sendTransaction({ from: await _user.getAddress(), to: liquidStaking.address, value: updateEpochAmount });
-    await liquidStaking.updateEpochSecondStep(_user);
-  }
-
   beforeEach(async () => {
     const signers = await ethers.getSigners();
     owner = signers[0];
@@ -37,7 +27,7 @@ describe("LiquidStaking", function () {
     // Create contracts
     stElaToken = await StElaToken.create();
     crossChainPayloadMock = await CrossChainPayloadMock.create();
-    liquidStaking = await LiquidStaking.create(stElaToken.address, crossChainPayloadMock.address, addr, 0.0001);
+    liquidStaking = await LiquidStaking.create(stElaToken, crossChainPayloadMock, addr, 0.0001);
   
     await stElaToken.transferOwnership(owner, liquidStaking.address);
 
@@ -47,6 +37,16 @@ describe("LiquidStaking", function () {
     initialCrossChainPayloadBalance = await crossChainPayloadMock.getContractBalance();
     initialUser1StElaTokenBalance = await stElaToken.balanceOf(await user1.getAddress());
   });
+
+  async function updateEpoch(
+    _user:Signer,
+    _exchangeRate:number
+  ): Promise<void> {
+    await liquidStaking.updateEpochFirstStep(_user, _exchangeRate);
+    const updateEpochAmount = await liquidStaking.getUpdateEpochAmount();
+    await _user.sendTransaction({ from: await _user.getAddress(), to: liquidStaking.address, value: updateEpochAmount });
+    await liquidStaking.updateEpochSecondStep(_user);
+  }
 
   it("Check if [setReceivePayloadAddress] works good", async function () {
     const addr = "NEW_ADDRESS";
@@ -90,7 +90,6 @@ describe("LiquidStaking", function () {
 
   it("Check if [requestWithdraw] works good", async function () {
     const amountToRequestWithdraw = 0.1;
-    await stElaToken.approve(user1, liquidStaking.address, amountToRequestWithdraw);
     await liquidStaking.requestWithdraw(user1,amountToRequestWithdraw);
 
     const currentUser1StElaTokenBalance = await stElaToken.balanceOf(await user1.getAddress());
@@ -102,7 +101,6 @@ describe("LiquidStaking", function () {
 
   it("Check if [withdraw] works good", async function () {
     const amountToRequestWithdraw = 0.1;
-    await stElaToken.approve(user1, liquidStaking.address, amountToRequestWithdraw);
     await liquidStaking.requestWithdraw(user1,amountToRequestWithdraw);
 
     await updateEpoch(owner, 10000);
@@ -120,13 +118,11 @@ describe("LiquidStaking", function () {
 
   it("Check if [requestWithdraw] and [withdraw] with hold step works good", async function () {
     const amountToRequestWithdrawBeforeUpdateEpoch = 0.1;
-    await stElaToken.approve(user1, liquidStaking.address, amountToRequestWithdrawBeforeUpdateEpoch);
     await liquidStaking.requestWithdraw(user1,amountToRequestWithdrawBeforeUpdateEpoch);
 
     await liquidStaking.updateEpochFirstStep(owner, 10000);
 
     const amountToRequestWithdrawAfterUpdateEpoch = 0.15;
-    await stElaToken.approve(user1, liquidStaking.address, amountToRequestWithdrawAfterUpdateEpoch);
     await liquidStaking.requestWithdraw(user1,amountToRequestWithdrawAfterUpdateEpoch);
 
     const withdrawForExecutesFirstCheck = await liquidStaking.getWithdrawForExecutes(await user1.getAddress());

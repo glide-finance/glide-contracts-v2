@@ -6,10 +6,23 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 
 contract CrossChainPayloadMock is ICrossChainPayload {
     using SafeMath for uint256;
-    event PayloadReceived(string _addr, uint256 _amount, uint256 _crosschainamount, address indexed _sender);
-    event EtherDeposited(address indexed _sender, uint256 _amount, address indexed _black);
+    event PayloadReceived(
+        string _addr,
+        uint256 _amount,
+        uint256 _crosschainamount,
+        address indexed _sender
+    );
+    event EtherDeposited(
+        address indexed _sender,
+        uint256 _amount,
+        address indexed _black
+    );
 
-    function receivePayload(string memory _addr, uint256 _amount, uint256 _fee) public override payable {
+    function receivePayload(
+        string memory _addr,
+        uint256 _amount,
+        uint256 _fee
+    ) public payable override {
         require(msg.value == _amount);
         require(_fee >= 100000000000000 && _fee % 10000000000 == 0);
         require(_amount % 10000000000 == 0 && _amount.sub(_fee) >= _fee);
