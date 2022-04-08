@@ -12,7 +12,7 @@ contract TestTokenTwo is ERC20, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
     EnumerableSet.AddressSet private _minters;
 
-    constructor() ERC20("Test Token TWO", "TSTTWO") public {
+    constructor() public ERC20("Test Token TWO", "TSTTWO") {
         _mint(msg.sender, preMineSupply);
     }
 

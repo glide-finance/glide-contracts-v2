@@ -1,5 +1,7 @@
 import { BigNumber, Contract, Signer, Transaction } from "ethers";
 import { ethers } from "hardhat";
+import { CrossChainPayloadMock} from "./CrossChainPayloadMock";
+import { StElaToken } from "./StElaToken";
 import { BaseContract } from "./BaseContract";
 import { toWei } from "./Utils";
 
@@ -8,23 +10,28 @@ export interface WithdrawForExecute {
   stElaOnHoldAmount: number;
 }
 export class LiquidStaking extends BaseContract {
-  constructor(contract:Contract) {
+  stElaToken:StElaToken;
+  crossChainPayloadMock: CrossChainPayloadMock;
+
+  constructor(contract:Contract, stElaToken: StElaToken, crossChainPayloadMock: CrossChainPayloadMock) {
     super(contract);
+    this.stElaToken = stElaToken;
+    this.crossChainPayloadMock = crossChainPayloadMock;
   }
 
   static async create(
-    _stElaTokenAddress:string,
-    _crossChainPayloadAddress:string,
+    _stElaToken:StElaToken,
+    _crossChainPayload:CrossChainPayloadMock,
     _receivePayloadAddress:string,
     _receivePayloadFee:number
   ): Promise<LiquidStaking> {
     return new LiquidStaking(await BaseContract.deployContract(
       "LiquidStaking", 
-      _stElaTokenAddress, 
-      _crossChainPayloadAddress,
+      _stElaToken.address, 
+      _crossChainPayload.address,
       _receivePayloadAddress,
       toWei(_receivePayloadFee)
-    ));
+    ), _stElaToken, _crossChainPayload);
   }
 
   getExchangeRateDivider():number{
@@ -92,6 +99,7 @@ export class LiquidStaking extends BaseContract {
     _user:Signer,
     _amount:number
   ): Promise<Transaction> {
+    await this.stElaToken.approve(_user, this.address, _amount);
     return this.contract.connect(_user).requestWithdraw(toWei(_amount));
   }
 

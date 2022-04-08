@@ -14,8 +14,8 @@
 pragma solidity ^0.6.12;
 
 // solhint-disable
-library GlideErrors{
-     // Liquid Staking
+library GlideErrors {
+    // Liquid Staking
     uint256 internal constant UPDATE_EPOCH_NO_ENOUGH_ELA = 101;
     uint256 internal constant RECEIVE_PAYLOAD_ADDRESS_ZERO = 102;
     uint256 internal constant REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT = 103;
@@ -23,18 +23,26 @@ library GlideErrors{
     uint256 internal constant WITHDRAW_TRANSFER_NOT_SUCCEESS = 105;
     uint256 internal constant SET_STELA_TRANSFER_OWNER = 106;
     uint256 internal constant TRANSFER_STELA_OWNERSHIP = 107;
-    
+    uint256 internal constant EXCHANGE_RATE_MUST_BE_GREATER_OR_EQUAL_PREVIOUS =
+        108;
+
+    // Liquid Staking Instant Swap
+    uint256 internal constant FEE_RATE_IS_NOT_IN_RANGE = 201;
+    uint256 internal constant NO_ENOUGH_STELA_IN_CONTRACT = 202;
+    uint256 internal constant NO_ENOUGH_ELA_IN_CONTRACT = 203;
+    uint256 internal constant SWAP_TRANSFER_NOT_SUCCEESS = 204;
+
     /**
-    * @dev Reverts if `condition` is false, with a revert reason containing `errorCode`. Only codes up to 999 are
-    * supported.
-    */
+     * @dev Reverts if `condition` is false, with a revert reason containing `errorCode`. Only codes up to 999 are
+     * supported.
+     */
     function _require(bool condition, uint256 errorCode) internal pure {
         if (!condition) _revert(errorCode);
     }
 
     /**
-    * @dev Reverts with a revert reason containing `errorCode`. Only codes up to 999 are supported.
-    */
+     * @dev Reverts with a revert reason containing `errorCode`. Only codes up to 999 are supported.
+     */
     function _revert(uint256 errorCode) internal pure {
         // We're going to dynamically create a revert string based on the error code, with the following format:
         // 'GLIDE#{errorCode}'
