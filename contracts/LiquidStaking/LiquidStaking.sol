@@ -140,7 +140,7 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
     }
 
     /// @dev How much amount needed before beginEpoch (complete update epoch)
-    /// @return uint256 Amount that is needed to be provided before updateEpochSecondStep
+    /// @return uint256 Amount that is needed to be provided before enableWithdaw
     function getUpdateEpochAmount() external view returns (uint256) {
         uint256 elaAmountForWithdraw = getELAAmountForWithdraw(
             prevEpochRequestTotal
@@ -181,7 +181,7 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
             GlideErrors.REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT
         );
 
-        _withdrawRequestToExecuteTransfer();
+        _withdrawRequestToReadyTransfer();
 
         withdrawRequests[msg.sender].stELAAmount = withdrawRequests[msg.sender]
             .stELAAmount
@@ -202,7 +202,7 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
         external
         nonReentrant
     {
-        _withdrawRequestToExecuteTransfer();
+        _withdrawRequestToReadyTransfer();
 
         if (!onHold) {
             if (withdrawReady[msg.sender].stELAOnHoldAmount > 0) {
@@ -240,6 +240,8 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
         emit Withdraw(msg.sender, _receiver, _amount, elaAmount);
     }
 
+    /// @dev Transfer owner will be set to a TimeLock contract
+    /// @param _stELATransferOwner address that controls ownership of the stELA token
     function setstELATransferOwner(address _stELATransferOwner) external {
         GlideErrors._require(
             msg.sender == stELATransferOwner,
@@ -248,6 +250,8 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
         stELATransferOwner = _stELATransferOwner;
     }
 
+    /// @dev Allow for the migration of the stELA token contract if upgrades are made to the LiquidStaking functions
+    /// @param _newOwner target address for transfering ownership of the stELA token 
     function transferstELAOwnership(address _newOwner) external {
         GlideErrors._require(
             msg.sender == stELATransferOwner,
@@ -256,6 +260,8 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
         stELA.transferOwnership(_newOwner);
     }
 
+    /// @dev Convert stELA to ELA based on current exchange rate
+    /// @param _stELAAmount amount of stELA token to be withdrawn
     function getELAAmountForWithdraw(uint256 _stELAAmount)
         public
         view
@@ -264,7 +270,8 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
         return _stELAAmount.div(exchangeRate).mul(_EXCHANGE_RATE_DIVIDER);
     }
 
-    function _withdrawRequestToExecuteTransfer() internal {
+    /// @dev Check if user has existing withdrawal request and add to ready status if funds are available
+    function _withdrawRequestToReadyTransfer() internal {
         if (
             withdrawRequests[msg.sender].stELAAmount > 0 &&
             withdrawRequests[msg.sender].epoch < currentEpoch
