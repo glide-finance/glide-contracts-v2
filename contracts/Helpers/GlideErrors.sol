@@ -16,7 +16,7 @@ pragma solidity ^0.6.12;
 // solhint-disable
 library GlideErrors {
     // Liquid Staking
-    uint256 internal constant UPDATE_EPOCH_NO_ENOUGH_ELA = 101;
+    uint256 internal constant UPDATE_EPOCH_NOT_ENOUGH_ELA = 101;
     uint256 internal constant RECEIVE_PAYLOAD_ADDRESS_ZERO = 102;
     uint256 internal constant REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT = 103;
     uint256 internal constant WITHDRAW_NOT_ENOUGH_AMOUNT = 104;
@@ -28,8 +28,8 @@ library GlideErrors {
 
     // Liquid Staking Instant Swap
     uint256 internal constant FEE_RATE_IS_NOT_IN_RANGE = 201;
-    uint256 internal constant NO_ENOUGH_STELA_IN_CONTRACT = 202;
-    uint256 internal constant NO_ENOUGH_ELA_IN_CONTRACT = 203;
+    uint256 internal constant NOT_ENOUGH_STELA_IN_CONTRACT = 202;
+    uint256 internal constant NOT_ENOUGH_ELA_IN_CONTRACT = 203;
     uint256 internal constant SWAP_TRANSFER_NOT_SUCCEESS = 204;
 
     /**
