@@ -6,8 +6,8 @@ import { BaseContract } from "./BaseContract";
 import { toWei } from "./Utils";
 
 export interface WithdrawForExecute {
-  stElaAmount: number;
-  stElaOnHoldAmount: number;
+  stELAAmount: number;
+  stELAOnHoldAmount: number;
 }
 export class LiquidStaking extends BaseContract {
   stElaToken:StElaToken;
@@ -43,7 +43,7 @@ export class LiquidStaking extends BaseContract {
   }
 
   async getWithdrawForExecutes(_userAddress:string): Promise<WithdrawForExecute> {
-    return this.contract.withdrawForExecutes(_userAddress);
+    return this.contract.withdrawReady(_userAddress);
   }
 
   async setReceivePayloadAddress(
@@ -74,13 +74,13 @@ export class LiquidStaking extends BaseContract {
     _user:Signer,
     _exchangeRate:number
   ): Promise<Transaction> {
-    return this.contract.connect(_user).updateEpochFirstStep(_exchangeRate);
+    return this.contract.connect(_user).updateEpoch(_exchangeRate);
   }
 
   async updateEpochSecondStep(
     _user:Signer
   ): Promise<Transaction> {
-    return this.contract.connect(_user).updateEpochSecondStep();
+    return this.contract.connect(_user).enableWithdraw();
   }
 
   async getUpdateEpochAmount(): Promise<BigNumber> {
@@ -115,17 +115,17 @@ export class LiquidStaking extends BaseContract {
     _user:Signer,
     _stElaTransferOwner:string
   ): Promise<Transaction> {
-    return this.contract.connect(_user).setStElaTransferOwner(_stElaTransferOwner);
+    return this.contract.connect(_user).setstELATransferOwner(_stElaTransferOwner);
   }
 
   async getStElaTransferOwner(): Promise<string> {
-    return this.contract.stElaTransferOwner();
+    return this.contract.stELATransferOwner();
   }
 
   async transferStElaOwnership(
     _user:Signer,
     _newOwner:string
   ): Promise<Transaction> {
-    return this.contract.connect(_user).transferStElaOwnership(_newOwner);
+    return this.contract.connect(_user).transferstELAOwnership(_newOwner);
   }
 }

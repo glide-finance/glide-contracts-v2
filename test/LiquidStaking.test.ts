@@ -126,7 +126,7 @@ describe("LiquidStaking", function () {
     await liquidStaking.requestWithdraw(user1,amountToRequestWithdrawAfterUpdateEpoch);
 
     const withdrawForExecutesFirstCheck = await liquidStaking.getWithdrawForExecutes(await user1.getAddress());
-    expect(withdrawForExecutesFirstCheck.stElaOnHoldAmount).equal(toWei(amountToRequestWithdrawBeforeUpdateEpoch));
+    expect(withdrawForExecutesFirstCheck.stELAOnHoldAmount).equal(toWei(amountToRequestWithdrawBeforeUpdateEpoch));
 
     const updateEpochAmount = await liquidStaking.getUpdateEpochAmount();
     await owner.sendTransaction({ from: await owner.getAddress(), to: liquidStaking.address, value: updateEpochAmount });
@@ -137,7 +137,7 @@ describe("LiquidStaking", function () {
     await liquidStaking.withdraw(user1, amountToRequestWithdrawBeforeUpdateEpoch, await user2.getAddress());
 
     const withdrawForExecutesSecondCheck = await liquidStaking.getWithdrawForExecutes(await user1.getAddress());
-    expect(withdrawForExecutesSecondCheck.stElaOnHoldAmount).equal(0);
+    expect(withdrawForExecutesSecondCheck.stELAOnHoldAmount).equal(0);
 
     const user2AmountAfterWithdraw = await user2.getBalance();
     expect(user2AmountBeforeWithdraw.add(toWei(amountToRequestWithdrawBeforeUpdateEpoch))).equal(user2AmountAfterWithdraw);

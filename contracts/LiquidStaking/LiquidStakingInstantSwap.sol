@@ -76,6 +76,25 @@ contract LiquidStakingInstantSwap is Ownable, ReentrancyGuard {
         stELA.transfer(_receiver, _stELAAmount);
     }
 
+    function withdrawEla(uint256 _elaAmount, address _receiver)
+        external
+        onlyOwner
+    {
+        GlideErrors._require(
+            _elaAmount <= elaAmount,
+            GlideErrors.NO_ENOUGH_WITHDRAW_ELA_IN_CONTRACT
+        );
+
+        elaAmount = elaAmount.sub(_elaAmount);
+        (bool successTransfer, ) = payable(_receiver).call{value: _elaAmount}(
+            ""
+        );
+        GlideErrors._require(
+            successTransfer,
+            GlideErrors.WITHDRAW_TRANSFER_NOT_SUCCEESS
+        );
+    }
+
     /// @dev Allows a user to pay a free to swap stELA to ELA instantly without wait period
     /// @param _stELAAmount stELA amount to swap
     /// @param _receiver Receiver for ELA

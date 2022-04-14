@@ -32,7 +32,7 @@ export class LiquidStakingInstantSwap extends BaseContract {
         _stElaAmount:number,
         _receiver:string
     ): Promise<Transaction> {
-        return this.contract.connect(_user).withdrawStEla(toWei(_stElaAmount), _receiver);
+        return this.contract.connect(_user).withdrawstELA(toWei(_stElaAmount), _receiver);
     }
 
     async swap(
