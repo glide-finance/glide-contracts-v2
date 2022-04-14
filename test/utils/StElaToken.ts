@@ -8,7 +8,7 @@ export class StElaToken extends BaseContract {
   }
 
   static async create(): Promise<StElaToken> {
-    return new StElaToken(await BaseContract.deployContract("StElaToken"));
+    return new StElaToken(await BaseContract.deployContract("stELAToken"));
   }
 
   async transferOwnership(_user:Signer, _newOwner: String): Promise<Transaction> {

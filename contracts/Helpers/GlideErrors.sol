@@ -31,6 +31,7 @@ library GlideErrors {
     uint256 internal constant NOT_ENOUGH_STELA_IN_CONTRACT = 202;
     uint256 internal constant NOT_ENOUGH_ELA_IN_CONTRACT = 203;
     uint256 internal constant SWAP_TRANSFER_NOT_SUCCEESS = 204;
+    uint256 internal constant NO_ENOUGH_WITHDRAW_ELA_IN_CONTRACT = 205;
 
     /**
      * @dev Reverts if `condition` is false, with a revert reason containing `errorCode`. Only codes up to 999 are
