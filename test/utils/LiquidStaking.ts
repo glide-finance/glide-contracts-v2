@@ -89,10 +89,9 @@ export class LiquidStaking extends BaseContract {
   
   async depoist(
     _user:Signer,
-    _stElaReceiver:string,
     _ethValue:number
   ): Promise<Transaction> {
-    return this.contract.connect(_user).deposit(_stElaReceiver, { value: toWei(_ethValue)});
+    return this.contract.connect(_user).deposit({ value: toWei(_ethValue)});
   }
 
   async requestWithdraw(
@@ -106,9 +105,8 @@ export class LiquidStaking extends BaseContract {
   async withdraw(
     _user:Signer,
     _amount:number,
-    _receiver:string
   ): Promise<Transaction> {
-    return this.contract.connect(_user).withdraw(toWei(_amount), _receiver);
+    return this.contract.connect(_user).withdraw(toWei(_amount));
   }
 
   async setStElaTransferOwner(

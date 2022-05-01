@@ -15,6 +15,7 @@ describe("LiquidStakingInstantSwap", function () {
   let owner:Signer
   let user1:Signer;
   let user2:Signer;
+  let feeAmount: number;
   let initialCrossChainPayloadBalance:BigNumber;
   let initialUser1StElaTokenBalance: BigNumber;
 
@@ -26,16 +27,18 @@ describe("LiquidStakingInstantSwap", function () {
 
     const addr = "ELASTOS_ADDRESS";
 
+    feeAmount =  0.0001; 
+
     // Create contracts
     stElaToken = await StElaToken.create();
     crossChainPayloadMock = await CrossChainPayloadMock.create();
-    liquidStaking = await LiquidStaking.create(stElaToken, crossChainPayloadMock, addr, 0.0001);
+    liquidStaking = await LiquidStaking.create(stElaToken, crossChainPayloadMock, addr,feeAmount);
     liquidStakingInstantSwap = await LiquidStakingInstantSwap.create(stElaToken, liquidStaking, 9970);
 
     await stElaToken.transferOwnership(owner, liquidStaking.address);
 
     const amountToDeposit = 1;
-    await liquidStaking.depoist(user1, await user1.getAddress(), amountToDeposit);
+    await liquidStaking.depoist(user1, amountToDeposit);
 
     await owner.sendTransaction({ from: await owner.getAddress(), to: liquidStakingInstantSwap.address, value: toWei(5) });
 
@@ -44,7 +47,7 @@ describe("LiquidStakingInstantSwap", function () {
   });
 
   it("Check if [swap] works good", async function () {
-    const amountToSwap = 1;
+    const amountToSwap = 1 - feeAmount;
     const user2BalanceBeforeSwap = await user2.getBalance();
     await liquidStakingInstantSwap.swap(user1, amountToSwap, await user2.getAddress());
     
@@ -54,10 +57,10 @@ describe("LiquidStakingInstantSwap", function () {
   });
 
   it("Check if [withdrawStEla] works good", async function () {
-    const amountToSwap = 1;
+    const amountToSwap = 1 - feeAmount;
     await liquidStakingInstantSwap.swap(user1, amountToSwap, await user2.getAddress());
     
-    await liquidStakingInstantSwap.withdrawStEla(owner, amountToSwap, await owner.getAddress());
+    await liquidStakingInstantSwap.withdrawStEla(owner, amountToSwap);
     
     expect(await stElaToken.balanceOf(liquidStakingInstantSwap.address)).equal(0);
     expect(await stElaToken.balanceOf(await owner.getAddress())).equal(toWei(amountToSwap));

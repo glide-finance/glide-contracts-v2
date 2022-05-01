@@ -1,19 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.12;
 
-import "./stELAToken.sol";
+import "./interfaces/ILiquidStaking.sol";
 import "./interfaces/ICrossChainPayload.sol";
+import "./stELAToken.sol";
 import "../Helpers/GlideErrors.sol";
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract LiquidStaking is Ownable, ReentrancyGuard {
+contract LiquidStaking is ILiquidStaking, Ownable, ReentrancyGuard {
     using SafeMath for uint256;
 
     uint256 private constant _EXCHANGE_RATE_DIVIDER = 10000;
-    stELAToken private immutable stELA;
-    ICrossChainPayload private immutable crossChainPayload;
+    uint256 private constant _EXCHANGE_RATE_UPPER_LIMIT = 100;
+
+    stELAToken public immutable stELA;
+    ICrossChainPayload public immutable crossChainPayload;
+
+    mapping(address => WithrawRequest) public withdrawRequests;
+    mapping(address => WithdrawReady) public withdrawReady;
 
     address public stELATransferOwner;
 
@@ -24,43 +31,9 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
     uint256 public exchangeRate;
     uint256 public currentEpoch;
     uint256 public totalWithdrawRequested;
-    uint256 public prevEpochRequestTotal;
     uint256 public currentEpochRequestTotal;
     uint256 public prevEpochDepositTotal;
     uint256 public totalELAForWithdraw;
-
-    struct WithrawRequest {
-        uint256 stELAAmount;
-        uint256 epoch;
-    }
-
-    struct WithdrawReady {
-        uint256 stELAAmount;
-        uint256 stELAOnHoldAmount;
-    }
-
-    mapping(address => WithrawRequest) public withdrawRequests;
-    mapping(address => WithdrawReady) public withdrawReady;
-
-    event Deposit(
-        address indexed user,
-        address receiver,
-        uint256 elaAmountDeposited,
-        uint256 stELAAmountReceived
-    );
-
-    event WithdrawRequest(address indexed user, uint256 amount);
-
-    event Withdraw(
-        address indexed user,
-        address receiver,
-        uint256 stELAAmountBurned,
-        uint256 elaReceived
-    );
-
-    event Fund(address indexed user, uint256 elaAmount);
-
-    event Epoch(uint256 indexed epoch, uint256 exchangeRate);
 
     constructor(
         stELAToken _stELA,
@@ -77,45 +50,56 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
         stELATransferOwner = msg.sender;
     }
 
-    receive() external payable {
+    receive() external payable onlyOwner {
         totalELAForWithdraw = totalELAForWithdraw.add(msg.value);
         prevEpochDepositTotal = totalELAForWithdraw;
 
         emit Fund(msg.sender, msg.value);
     }
 
-    /// @dev Set mainchain address for crosschain tranfer where ELA will be deposit
-    /// @param _receivePayloadAddress Mainchain address
-    function setReceivePayloadAddress(string memory _receivePayloadAddress)
+    function setReceivePayloadAddress(string calldata _receivePayloadAddress)
         external
         payable
+        override
         onlyOwner
     {
+        GlideErrors._require(
+            bytes(_receivePayloadAddress).length == 34,
+            GlideErrors.ELASTOS_MAINNET_ADDRESS_LENGTH
+        );
+
         receivePayloadAddress = _receivePayloadAddress;
+
+        emit ReceivePayloadAddressChange(_receivePayloadAddress);
     }
 
-    /// @dev Set fee that will be payed for crosschain transfer when user deposit ELA
-    /// @param _receivePayloadFee Fee amount
     function setReceivePayloadFee(uint256 _receivePayloadFee)
         external
         payable
+        override
         onlyOwner
     {
         receivePayloadFee = _receivePayloadFee;
+
+        emit ReceivePayloadFeeChange(receivePayloadFee);
     }
 
-    /// @dev First step for update epoch (before amount send to contract)
-    /// @param _exchangeRate Exchange rate
-    function updateEpoch(uint256 _exchangeRate) external onlyOwner {
+    function updateEpoch(uint256 _exchangeRate) external override onlyOwner {
         GlideErrors._require(
             _exchangeRate >= exchangeRate,
             GlideErrors.EXCHANGE_RATE_MUST_BE_GREATER_OR_EQUAL_PREVIOUS
         );
 
+        GlideErrors._require(
+            _exchangeRate <= exchangeRate.add(_EXCHANGE_RATE_UPPER_LIMIT),
+            GlideErrors.EXCHANGE_RATE_UPPER_LIMIT
+        );
+
+        GlideErrors._require(!onHold, GlideErrors.STATUS_CANNOT_BE_ONHOLD);
+
         totalWithdrawRequested = totalWithdrawRequested.add(
             currentEpochRequestTotal
         );
-        prevEpochRequestTotal = totalWithdrawRequested;
         currentEpochRequestTotal = 0;
         currentEpoch = currentEpoch.add(1);
         exchangeRate = _exchangeRate;
@@ -124,26 +108,26 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
         emit Epoch(currentEpoch, _exchangeRate);
     }
 
-    /// @dev Second step for update epoch (after balance for withdrawal received)
-    function enableWithdraw() external onlyOwner {
+    function enableWithdraw() external override onlyOwner {
+        GlideErrors._require(onHold, GlideErrors.STATUS_MUST_BE_ONHOLD);
+
         uint256 prevEpochELAForWithdraw = getELAAmountForWithdraw(
-            prevEpochRequestTotal
+            totalWithdrawRequested
         );
 
         GlideErrors._require(
             prevEpochDepositTotal >= prevEpochELAForWithdraw,
             GlideErrors.UPDATE_EPOCH_NOT_ENOUGH_ELA
         );
-        prevEpochRequestTotal = 0;
         prevEpochDepositTotal = 0;
         onHold = false;
+
+        emit EnableWithdraw(prevEpochELAForWithdraw);
     }
 
-    /// @dev How much amount needed before beginEpoch (complete update epoch)
-    /// @return uint256 Amount that is needed to be provided before enableWithdaw
-    function getUpdateEpochAmount() external view returns (uint256) {
+    function getUpdateEpochAmount() external view override returns (uint256) {
         uint256 elaAmountForWithdraw = getELAAmountForWithdraw(
-            prevEpochRequestTotal
+            totalWithdrawRequested
         );
         if (elaAmountForWithdraw > prevEpochDepositTotal) {
             return elaAmountForWithdraw.sub(prevEpochDepositTotal);
@@ -151,13 +135,16 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
         return 0;
     }
 
-    /// @dev Deposit ELA amount and get stELA token
-    /// @param _stELAReceiver Receiver for stELA token
-    function deposit(address _stELAReceiver) external payable {
+    function deposit() external payable override {
         GlideErrors._require(
             bytes(receivePayloadAddress).length != 0,
             GlideErrors.RECEIVE_PAYLOAD_ADDRESS_ZERO
         );
+
+        uint256 receivePayloadAmount = msg.value.sub(receivePayloadFee);
+        uint256 amountOut = (receivePayloadAmount.mul(_EXCHANGE_RATE_DIVIDER))
+            .div(exchangeRate);
+        stELA.mint(msg.sender, amountOut);
 
         crossChainPayload.receivePayload{value: msg.value}(
             receivePayloadAddress,
@@ -165,17 +152,10 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
             receivePayloadFee
         );
 
-        uint256 amountOut = (msg.value.mul(_EXCHANGE_RATE_DIVIDER)).div(
-            exchangeRate
-        );
-        stELA.mint(_stELAReceiver, amountOut);
-
-        emit Deposit(msg.sender, _stELAReceiver, msg.value, amountOut);
+        emit Deposit(msg.sender, msg.value, amountOut);
     }
 
-    /// @dev Request withdraw stELA amount and get ELA
-    /// @param _amount stELA amount that user requested to withdraw
-    function requestWithdraw(uint256 _amount) external {
+    function requestWithdraw(uint256 _amount) external override {
         GlideErrors._require(
             _amount <= stELA.balanceOf(msg.sender),
             GlideErrors.REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT
@@ -195,13 +175,7 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
         emit WithdrawRequest(msg.sender, _amount);
     }
 
-    /// @dev Withdraw stELA amount and get ELA coin
-    /// @param _amount stELA amount that user want to withdraw
-    /// @param _receiver Receiver for ELA coin
-    function withdraw(uint256 _amount, address _receiver)
-        external
-        nonReentrant
-    {
+    function withdraw(uint256 _amount) external override nonReentrant {
         _withdrawRequestToReadyTransfer();
 
         if (!onHold) {
@@ -229,42 +203,44 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
         stELA.burn(address(this), _amount);
 
         // solhint-disable-next-line avoid-low-level-calls
-        (bool successTransfer, ) = payable(_receiver).call{value: elaAmount}(
+        (bool successTransfer, ) = payable(msg.sender).call{value: elaAmount}(
             ""
         );
         GlideErrors._require(
             successTransfer,
-            GlideErrors.WITHDRAW_TRANSFER_NOT_SUCCEESS
+            GlideErrors.WITHDRAW_TRANSFER_NOT_SUCCESS
         );
 
-        emit Withdraw(msg.sender, _receiver, _amount, elaAmount);
+        emit Withdraw(msg.sender, _amount, elaAmount);
     }
 
-    /// @dev Transfer owner will be set to a TimeLock contract
-    /// @param _stELATransferOwner address that controls ownership of the stELA token
-    function setstELATransferOwner(address _stELATransferOwner) external {
+    function setstELATransferOwner(address _stELATransferOwner)
+        external
+        override
+    {
         GlideErrors._require(
             msg.sender == stELATransferOwner,
             GlideErrors.SET_STELA_TRANSFER_OWNER
         );
         stELATransferOwner = _stELATransferOwner;
+
+        emit StELATransferOwner(_stELATransferOwner);
     }
 
-    /// @dev Allow for the migration of the stELA token contract if upgrades are made to the LiquidStaking functions
-    /// @param _newOwner target address for transfering ownership of the stELA token 
-    function transferstELAOwnership(address _newOwner) external {
+    function transferstELAOwnership(address _newOwner) external override {
         GlideErrors._require(
             msg.sender == stELATransferOwner,
             GlideErrors.TRANSFER_STELA_OWNERSHIP
         );
         stELA.transferOwnership(_newOwner);
+
+        emit StELAOwner(_newOwner);
     }
 
-    /// @dev Convert stELA to ELA based on current exchange rate
-    /// @param _stELAAmount amount of stELA token to be withdrawn
     function getELAAmountForWithdraw(uint256 _stELAAmount)
         public
         view
+        override
         returns (uint256)
     {
         return _stELAAmount.div(exchangeRate).mul(_EXCHANGE_RATE_DIVIDER);
@@ -288,7 +264,10 @@ contract LiquidStaking is Ownable, ReentrancyGuard {
             } else {
                 withdrawReady[msg.sender].stELAAmount = withdrawReady[
                     msg.sender
-                ].stELAAmount.add(withdrawRequests[msg.sender].stELAAmount);
+                ].stELAAmount.add(withdrawRequests[msg.sender].stELAAmount).add(
+                        withdrawReady[msg.sender].stELAOnHoldAmount
+                    );
+                withdrawReady[msg.sender].stELAOnHoldAmount = 0;
             }
             withdrawRequests[msg.sender].stELAAmount = 0;
         }

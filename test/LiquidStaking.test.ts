@@ -13,6 +13,7 @@ describe("LiquidStaking", function () {
   let owner:Signer
   let user1:Signer;
   let user2:Signer;
+  let feeAmount: number;
   let initialCrossChainPayloadBalance:BigNumber;
   let initialUser1StElaTokenBalance: BigNumber;
 
@@ -22,17 +23,19 @@ describe("LiquidStaking", function () {
     user1 = signers[1];
     user2 = signers[2];
 
-    const addr = "ELASTOS_ADDRESS";
+    const addr = "EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+    feeAmount = 0.0001;
 
     // Create contracts
     stElaToken = await StElaToken.create();
     crossChainPayloadMock = await CrossChainPayloadMock.create();
-    liquidStaking = await LiquidStaking.create(stElaToken, crossChainPayloadMock, addr, 0.0001);
+    liquidStaking = await LiquidStaking.create(stElaToken, crossChainPayloadMock, addr, feeAmount);
   
     await stElaToken.transferOwnership(owner, liquidStaking.address);
 
     const amountToDeposit = 1;
-    await liquidStaking.depoist(user1, await user1.getAddress(), amountToDeposit);
+    await liquidStaking.depoist(user1, amountToDeposit);
 
     initialCrossChainPayloadBalance = await crossChainPayloadMock.getContractBalance();
     initialUser1StElaTokenBalance = await stElaToken.balanceOf(await user1.getAddress());
@@ -49,7 +52,7 @@ describe("LiquidStaking", function () {
   }
 
   it("Check if [setReceivePayloadAddress] works good", async function () {
-    const addr = "NEW_ADDRESS";
+    const addr = "EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE";
     await liquidStaking.setReceivePayloadAddress(owner, addr);
     const getAddr = await liquidStaking.getReceivePayloadAddress();
 
@@ -66,26 +69,26 @@ describe("LiquidStaking", function () {
 
   it("Check if [deposit] works good", async function () {
     const amountToDeposit = 1;
-    await liquidStaking.depoist(user1, await user1.getAddress(), amountToDeposit);
+    await liquidStaking.depoist(user1, amountToDeposit);
 
     expect(toWei(amountToDeposit).toString()).equal(((await crossChainPayloadMock.getContractBalance()).sub(initialCrossChainPayloadBalance)));
 
     const currentStElaTokenBalance = await stElaToken.balanceOf(await user1.getAddress());
-    expect(toWei(amountToDeposit).toString()).equal(currentStElaTokenBalance.sub(initialUser1StElaTokenBalance));
+    expect(toWei(amountToDeposit - feeAmount).toString()).equal(currentStElaTokenBalance.sub(initialUser1StElaTokenBalance));
   });
 
   it("Check if [deposit] works good after update epoch", async function () {
-    const exchangeRate = 10500;
+    const exchangeRate = 10100;
     await updateEpoch(owner, exchangeRate);
 
     const amountToDeposit = 1;
-    await liquidStaking.depoist(user1, await user1.getAddress(), amountToDeposit);
+    await liquidStaking.depoist(user1, amountToDeposit);
 
     expect(+toWei(amountToDeposit)).equal(+((await crossChainPayloadMock.getContractBalance()).sub(initialCrossChainPayloadBalance)));
     
     const currentStElaTokenBalance = +(await stElaToken.balanceOf(await user1.getAddress())).sub(initialUser1StElaTokenBalance);
 
-    expect(+toWei(amountToDeposit * liquidStaking.getExchangeRateDivider() / exchangeRate)).to.be.equal(+currentStElaTokenBalance*1);
+    expect(+toWei((amountToDeposit - feeAmount) * liquidStaking.getExchangeRateDivider() / exchangeRate)).to.be.equal(+currentStElaTokenBalance*1);
   });
 
   it("Check if [requestWithdraw] works good", async function () {
@@ -105,12 +108,12 @@ describe("LiquidStaking", function () {
 
     await updateEpoch(owner, 10000);
 
-    const user2AmountBeforeWithdraw = await user2.getBalance();
+    const user1AmountBeforeWithdraw = await user1.getBalance();
     const stElaTotalSupplyBeforeWithdraw = await stElaToken.totalSupply();
-    await liquidStaking.withdraw(user1, amountToRequestWithdraw, await user2.getAddress());
+    await liquidStaking.withdraw(user1, amountToRequestWithdraw);
 
-    const user2AmountAfterWithdraw = await user2.getBalance();
-    expect(user2AmountBeforeWithdraw.add(toWei(amountToRequestWithdraw))).equal(user2AmountAfterWithdraw);
+    const user1AmountAfterWithdraw = await user1.getBalance();
+    expect(+user1AmountAfterWithdraw).lessThanOrEqual(+user1AmountBeforeWithdraw.add(toWei(amountToRequestWithdraw)));
 
     const stElaTotalSupplyAfterWithdraw = await stElaToken.totalSupply();
     expect(stElaTotalSupplyBeforeWithdraw.sub(toWei(amountToRequestWithdraw))).equal(stElaTotalSupplyAfterWithdraw);
@@ -132,15 +135,15 @@ describe("LiquidStaking", function () {
     await owner.sendTransaction({ from: await owner.getAddress(), to: liquidStaking.address, value: updateEpochAmount });
     await liquidStaking.updateEpochSecondStep(owner);
 
-    const user2AmountBeforeWithdraw = await user2.getBalance();
+    const user1AmountBeforeWithdraw = await user1.getBalance();
     const stElaTotalSupplyBeforeWithdraw = await stElaToken.totalSupply();
-    await liquidStaking.withdraw(user1, amountToRequestWithdrawBeforeUpdateEpoch, await user2.getAddress());
+    await liquidStaking.withdraw(user1, amountToRequestWithdrawBeforeUpdateEpoch);
 
     const withdrawForExecutesSecondCheck = await liquidStaking.getWithdrawForExecutes(await user1.getAddress());
     expect(withdrawForExecutesSecondCheck.stELAOnHoldAmount).equal(0);
 
-    const user2AmountAfterWithdraw = await user2.getBalance();
-    expect(user2AmountBeforeWithdraw.add(toWei(amountToRequestWithdrawBeforeUpdateEpoch))).equal(user2AmountAfterWithdraw);
+    const user1AmountAfterWithdraw = await user1.getBalance();
+    expect(+user1AmountAfterWithdraw).lessThanOrEqual(+user1AmountBeforeWithdraw.add(toWei(amountToRequestWithdrawBeforeUpdateEpoch)));
 
     const stElaTotalSupplyAfterWithdraw = await stElaToken.totalSupply();
     expect(stElaTotalSupplyBeforeWithdraw.sub(toWei(amountToRequestWithdrawBeforeUpdateEpoch))).equal(stElaTotalSupplyAfterWithdraw);

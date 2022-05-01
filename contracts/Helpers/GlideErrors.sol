@@ -20,11 +20,15 @@ library GlideErrors {
     uint256 internal constant RECEIVE_PAYLOAD_ADDRESS_ZERO = 102;
     uint256 internal constant REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT = 103;
     uint256 internal constant WITHDRAW_NOT_ENOUGH_AMOUNT = 104;
-    uint256 internal constant WITHDRAW_TRANSFER_NOT_SUCCEESS = 105;
+    uint256 internal constant WITHDRAW_TRANSFER_NOT_SUCCESS = 105;
     uint256 internal constant SET_STELA_TRANSFER_OWNER = 106;
     uint256 internal constant TRANSFER_STELA_OWNERSHIP = 107;
     uint256 internal constant EXCHANGE_RATE_MUST_BE_GREATER_OR_EQUAL_PREVIOUS =
         108;
+    uint256 internal constant ELASTOS_MAINNET_ADDRESS_LENGTH = 109;
+    uint256 internal constant EXCHANGE_RATE_UPPER_LIMIT = 110;
+    uint256 internal constant STATUS_CANNOT_BE_ONHOLD = 111;
+    uint256 internal constant STATUS_MUST_BE_ONHOLD = 112;
 
     // Liquid Staking Instant Swap
     uint256 internal constant FEE_RATE_IS_NOT_IN_RANGE = 201;

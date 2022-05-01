@@ -1,37 +1,36 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.12;
 
-import "./LiquidStaking.sol";
-import "./stELAToken.sol";
+import "./interfaces/ILiquidStaking.sol";
+import "./interfaces/ILiquidStakingInstantSwap.sol";
 import "../Helpers/GlideErrors.sol";
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract LiquidStakingInstantSwap is Ownable, ReentrancyGuard {
+contract LiquidStakingInstantSwap is
+    ILiquidStakingInstantSwap,
+    Ownable,
+    ReentrancyGuard
+{
+    using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
     uint256 private constant _FEE_DIVIDER = 10000;
 
-    stELAToken private immutable stELA;
-    LiquidStaking private immutable liquidStaking;
+    IERC20 public immutable stELA;
+    ILiquidStaking public immutable liquidStaking;
 
     uint256 public elaAmount;
     uint256 public feeRate;
     uint256 public stELAAmount;
 
-    event Fund(address indexed user, uint256 elaAmount);
-
-    event Swap(
-        address indexed user,
-        uint256 stELAAmountSend,
-        uint256 elaAmountReceived,
-        address receiver
-    );
-
     constructor(
-        stELAToken _stELA,
-        LiquidStaking _liquidStaking,
+        IERC20 _stELA,
+        ILiquidStaking _liquidStaking,
         uint256 _feeRate
     ) public feeInRange(_feeRate) {
         stELA = _stELA;
@@ -49,57 +48,56 @@ contract LiquidStakingInstantSwap is Ownable, ReentrancyGuard {
     }
 
     /// @dev Add amount of ELA available in contract for instant swap
-    receive() external payable {
+    receive() external payable onlyOwner {
         elaAmount = elaAmount.add(msg.value);
 
         emit Fund(msg.sender, msg.value);
     }
 
-    /// @param _feeRate For 0% fee, set 10000. For 1% fee, set 9900. For 0.5%, set 9950.
-    function setFee(uint256 _feeRate) external onlyOwner feeInRange(_feeRate) {
+    function setFee(uint256 _feeRate)
+        external
+        override
+        onlyOwner
+        feeInRange(_feeRate)
+    {
         feeRate = _feeRate;
+
+        emit FeeRate(feeRate);
     }
 
-    /// @dev Admin function to withdraw stELA from contract and convert back to ELA using LiquidStaking.sol 
-    /// @param _stELAAmount stELA amount to withdraw
-    /// @param _receiver Receiver for stELA
-    function withdrawstELA(uint256 _stELAAmount, address _receiver)
-        external
-        onlyOwner
-    {
+    function withdrawstELA(uint256 _stELAAmount) external override onlyOwner {
         GlideErrors._require(
             _stELAAmount <= stELAAmount,
             GlideErrors.NOT_ENOUGH_STELA_IN_CONTRACT
         );
 
         stELAAmount = stELAAmount.sub(_stELAAmount);
-        stELA.transfer(_receiver, _stELAAmount);
+        stELA.safeTransfer(msg.sender, _stELAAmount);
+
+        emit StELAWithdraw(msg.sender, _stELAAmount);
     }
 
-    function withdrawEla(uint256 _elaAmount, address _receiver)
-        external
-        onlyOwner
-    {
+    function withdrawEla(uint256 _elaAmount) external override onlyOwner {
         GlideErrors._require(
             _elaAmount <= elaAmount,
             GlideErrors.NO_ENOUGH_WITHDRAW_ELA_IN_CONTRACT
         );
 
         elaAmount = elaAmount.sub(_elaAmount);
-        (bool successTransfer, ) = payable(_receiver).call{value: _elaAmount}(
+        (bool successTransfer, ) = payable(msg.sender).call{value: _elaAmount}(
             ""
         );
         GlideErrors._require(
             successTransfer,
-            GlideErrors.WITHDRAW_TRANSFER_NOT_SUCCEESS
+            GlideErrors.WITHDRAW_TRANSFER_NOT_SUCCESS
         );
+
+        emit ElaWithdraw(msg.sender, _elaAmount);
     }
 
-    /// @dev Allows a user to pay a free to swap stELA to ELA instantly without wait period
-    /// @param _stELAAmount stELA amount to swap
-    /// @param _receiver Receiver for ELA
     function swap(uint256 _stELAAmount, address _receiver)
         external
+        override
         nonReentrant
     {
         uint256 amountForSwap = _stELAAmount.mul(feeRate).div(_FEE_DIVIDER);
@@ -113,8 +111,9 @@ contract LiquidStakingInstantSwap is Ownable, ReentrancyGuard {
             GlideErrors.NOT_ENOUGH_ELA_IN_CONTRACT
         );
 
-        stELA.transferFrom(msg.sender, address(this), _stELAAmount);
+        stELA.safeTransferFrom(msg.sender, address(this), _stELAAmount);
 
+        elaAmount = elaAmount.sub(elaAmountForWithdraw);
         (bool successTransfer, ) = payable(_receiver).call{
             value: elaAmountForWithdraw
         }("");
