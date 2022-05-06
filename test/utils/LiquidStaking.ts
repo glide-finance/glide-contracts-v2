@@ -6,8 +6,8 @@ import { BaseContract } from "./BaseContract";
 import { toWei } from "./Utils";
 
 export interface WithdrawForExecute {
-  stELAAmount: number;
-  stELAOnHoldAmount: number;
+  elaAmount: number;
+  elaOnHoldAmount: number;
 }
 export class LiquidStaking extends BaseContract {
   stElaToken:StElaToken;
