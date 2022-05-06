@@ -30,10 +30,9 @@ contract LiquidStaking is ILiquidStaking, Ownable, ReentrancyGuard {
     bool public onHold;
     uint256 public exchangeRate;
     uint256 public currentEpoch;
-    uint256 public totalWithdrawRequested;
+    uint256 public totalELAWithdrawRequested;
     uint256 public currentEpochRequestTotal;
-    uint256 public prevEpochDepositTotal;
-    uint256 public totalELAForWithdraw;
+    uint256 public totalELA;
 
     constructor(
         stELAToken _stELA,
@@ -51,8 +50,7 @@ contract LiquidStaking is ILiquidStaking, Ownable, ReentrancyGuard {
     }
 
     receive() external payable onlyOwner {
-        totalELAForWithdraw = totalELAForWithdraw.add(msg.value);
-        prevEpochDepositTotal = totalELAForWithdraw;
+        totalELA = totalELA.add(msg.value);
 
         emit Fund(msg.sender, msg.value);
     }
@@ -97,7 +95,7 @@ contract LiquidStaking is ILiquidStaking, Ownable, ReentrancyGuard {
 
         GlideErrors._require(!onHold, GlideErrors.STATUS_CANNOT_BE_ONHOLD);
 
-        totalWithdrawRequested = totalWithdrawRequested.add(
+        totalELAWithdrawRequested = totalELAWithdrawRequested.add(
             currentEpochRequestTotal
         );
         currentEpochRequestTotal = 0;
@@ -111,26 +109,18 @@ contract LiquidStaking is ILiquidStaking, Ownable, ReentrancyGuard {
     function enableWithdraw() external override onlyOwner {
         GlideErrors._require(onHold, GlideErrors.STATUS_MUST_BE_ONHOLD);
 
-        uint256 prevEpochELAForWithdraw = getELAAmountForWithdraw(
-            totalWithdrawRequested
-        );
-
         GlideErrors._require(
-            prevEpochDepositTotal >= prevEpochELAForWithdraw,
+            totalELA >= totalELAWithdrawRequested,
             GlideErrors.UPDATE_EPOCH_NOT_ENOUGH_ELA
         );
-        prevEpochDepositTotal = 0;
         onHold = false;
 
-        emit EnableWithdraw(prevEpochELAForWithdraw);
+        emit EnableWithdraw(totalELAWithdrawRequested);
     }
 
     function getUpdateEpochAmount() external view override returns (uint256) {
-        uint256 elaAmountForWithdraw = getELAAmountForWithdraw(
-            totalWithdrawRequested
-        );
-        if (elaAmountForWithdraw > prevEpochDepositTotal) {
-            return elaAmountForWithdraw.sub(prevEpochDepositTotal);
+        if (totalELAWithdrawRequested > totalELA) {
+            return totalELAWithdrawRequested.sub(totalELA);
         }
         return 0;
     }
@@ -155,55 +145,53 @@ contract LiquidStaking is ILiquidStaking, Ownable, ReentrancyGuard {
         emit Deposit(msg.sender, msg.value, amountOut);
     }
 
-    function requestWithdraw(uint256 _amount) external override {
+    function requestWithdraw(uint256 _stELAAmount) external override {
         GlideErrors._require(
-            _amount <= stELA.balanceOf(msg.sender),
+            _stELAAmount <= stELA.balanceOf(msg.sender),
             GlideErrors.REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT
         );
 
         _withdrawRequestToReadyTransfer();
 
-        withdrawRequests[msg.sender].stELAAmount = withdrawRequests[msg.sender]
-            .stELAAmount
-            .add(_amount);
+        stELA.burn(msg.sender, _stELAAmount);
+
+        uint256 elaAmount = getELAAmountForWithdraw(_stELAAmount);
+
+        withdrawRequests[msg.sender].elaAmount = withdrawRequests[msg.sender]
+            .elaAmount
+            .add(elaAmount);
         withdrawRequests[msg.sender].epoch = currentEpoch;
 
-        currentEpochRequestTotal = currentEpochRequestTotal.add(_amount);
+        currentEpochRequestTotal = currentEpochRequestTotal.add(elaAmount);
 
-        stELA.transferFrom(msg.sender, address(this), _amount);
-
-        emit WithdrawRequest(msg.sender, _amount);
+        emit WithdrawRequest(msg.sender, _stELAAmount, elaAmount);
     }
 
-    function withdraw(uint256 _amount) external override nonReentrant {
+    function withdraw(uint256 _elaAmount) external override nonReentrant {
         _withdrawRequestToReadyTransfer();
 
         if (!onHold) {
-            if (withdrawReady[msg.sender].stELAOnHoldAmount > 0) {
-                withdrawReady[msg.sender].stELAAmount = withdrawReady[
-                    msg.sender
-                ].stELAAmount.add(withdrawReady[msg.sender].stELAOnHoldAmount);
-                withdrawReady[msg.sender].stELAOnHoldAmount = 0;
+            if (withdrawReady[msg.sender].elaOnHoldAmount > 0) {
+                withdrawReady[msg.sender].elaAmount = withdrawReady[msg.sender]
+                    .elaAmount
+                    .add(withdrawReady[msg.sender].elaOnHoldAmount);
+                withdrawReady[msg.sender].elaOnHoldAmount = 0;
             }
         }
 
         GlideErrors._require(
-            _amount <= withdrawReady[msg.sender].stELAAmount,
+            _elaAmount <= withdrawReady[msg.sender].elaAmount,
             GlideErrors.WITHDRAW_NOT_ENOUGH_AMOUNT
         );
-        withdrawReady[msg.sender].stELAAmount = withdrawReady[msg.sender]
-            .stELAAmount
-            .sub(_amount);
+        withdrawReady[msg.sender].elaAmount = withdrawReady[msg.sender]
+            .elaAmount
+            .sub(_elaAmount);
 
-        uint256 elaAmount = getELAAmountForWithdraw(_amount);
-
-        totalWithdrawRequested = totalWithdrawRequested.sub(_amount);
-        totalELAForWithdraw = totalELAForWithdraw.sub(elaAmount);
-
-        stELA.burn(address(this), _amount);
+        totalELAWithdrawRequested = totalELAWithdrawRequested.sub(_elaAmount);
+        totalELA = totalELA.sub(_elaAmount);
 
         // solhint-disable-next-line avoid-low-level-calls
-        (bool successTransfer, ) = payable(msg.sender).call{value: elaAmount}(
+        (bool successTransfer, ) = payable(msg.sender).call{value: _elaAmount}(
             ""
         );
         GlideErrors._require(
@@ -211,7 +199,7 @@ contract LiquidStaking is ILiquidStaking, Ownable, ReentrancyGuard {
             GlideErrors.WITHDRAW_TRANSFER_NOT_SUCCESS
         );
 
-        emit Withdraw(msg.sender, _amount, elaAmount);
+        emit Withdraw(msg.sender, _elaAmount);
     }
 
     function setstELATransferOwner(address _stELATransferOwner)
@@ -243,33 +231,30 @@ contract LiquidStaking is ILiquidStaking, Ownable, ReentrancyGuard {
         override
         returns (uint256)
     {
-        return _stELAAmount.div(exchangeRate).mul(_EXCHANGE_RATE_DIVIDER);
+        return _stELAAmount.mul(exchangeRate).div(_EXCHANGE_RATE_DIVIDER);
     }
 
     /// @dev Check if user has existing withdrawal request and add to ready status if funds are available
     function _withdrawRequestToReadyTransfer() internal {
         if (
-            withdrawRequests[msg.sender].stELAAmount > 0 &&
+            withdrawRequests[msg.sender].elaAmount > 0 &&
             withdrawRequests[msg.sender].epoch < currentEpoch
         ) {
             if (
                 onHold &&
                 currentEpoch.sub(withdrawRequests[msg.sender].epoch) == 1
             ) {
-                withdrawReady[msg.sender].stELAOnHoldAmount = withdrawReady[
+                withdrawReady[msg.sender].elaOnHoldAmount = withdrawReady[
                     msg.sender
-                ].stELAOnHoldAmount.add(
-                        withdrawRequests[msg.sender].stELAAmount
-                    );
+                ].elaOnHoldAmount.add(withdrawRequests[msg.sender].elaAmount);
             } else {
-                withdrawReady[msg.sender].stELAAmount = withdrawReady[
-                    msg.sender
-                ].stELAAmount.add(withdrawRequests[msg.sender].stELAAmount).add(
-                        withdrawReady[msg.sender].stELAOnHoldAmount
-                    );
-                withdrawReady[msg.sender].stELAOnHoldAmount = 0;
+                withdrawReady[msg.sender].elaAmount = withdrawReady[msg.sender]
+                    .elaAmount
+                    .add(withdrawRequests[msg.sender].elaAmount)
+                    .add(withdrawReady[msg.sender].elaOnHoldAmount);
+                withdrawReady[msg.sender].elaOnHoldAmount = 0;
             }
-            withdrawRequests[msg.sender].stELAAmount = 0;
+            withdrawRequests[msg.sender].elaAmount = 0;
         }
     }
 }

@@ -5,13 +5,13 @@ import "./ICrossChainPayload.sol";
 
 interface ILiquidStaking {
     struct WithrawRequest {
-        uint256 stELAAmount;
+        uint256 elaAmount;
         uint256 epoch;
     }
 
     struct WithdrawReady {
-        uint256 stELAAmount;
-        uint256 stELAOnHoldAmount;
+        uint256 elaAmount;
+        uint256 elaOnHoldAmount;
     }
 
     event Deposit(
@@ -20,13 +20,13 @@ interface ILiquidStaking {
         uint256 stELAAmountReceived
     );
 
-    event WithdrawRequest(address indexed user, uint256 amount);
-
-    event Withdraw(
+    event WithdrawRequest(
         address indexed user,
-        uint256 stELAAmountBurned,
-        uint256 elaReceived
+        uint256 amount,
+        uint256 elaAmount
     );
+
+    event Withdraw(address indexed user, uint256 elaReceived);
 
     event Fund(address indexed user, uint256 elaAmount);
 

@@ -93,13 +93,10 @@ describe("LiquidStaking", function () {
 
   it("Check if [requestWithdraw] works good", async function () {
     const amountToRequestWithdraw = 0.1;
-    await liquidStaking.requestWithdraw(user1,amountToRequestWithdraw);
+    await liquidStaking.requestWithdraw(user1, amountToRequestWithdraw);
 
     const currentUser1StElaTokenBalance = await stElaToken.balanceOf(await user1.getAddress());
     expect(toWei(amountToRequestWithdraw)).equal(initialUser1StElaTokenBalance.sub(currentUser1StElaTokenBalance));
-
-    const currentLSStElaTokenBalance = await stElaToken.balanceOf(liquidStaking.address);
-    expect(toWei(amountToRequestWithdraw)).equal(currentLSStElaTokenBalance);
   });
 
   it("Check if [withdraw] works good", async function () {
@@ -109,14 +106,10 @@ describe("LiquidStaking", function () {
     await updateEpoch(owner, 10000);
 
     const user1AmountBeforeWithdraw = await user1.getBalance();
-    const stElaTotalSupplyBeforeWithdraw = await stElaToken.totalSupply();
     await liquidStaking.withdraw(user1, amountToRequestWithdraw);
 
     const user1AmountAfterWithdraw = await user1.getBalance();
     expect(+user1AmountAfterWithdraw).lessThanOrEqual(+user1AmountBeforeWithdraw.add(toWei(amountToRequestWithdraw)));
-
-    const stElaTotalSupplyAfterWithdraw = await stElaToken.totalSupply();
-    expect(stElaTotalSupplyBeforeWithdraw.sub(toWei(amountToRequestWithdraw))).equal(stElaTotalSupplyAfterWithdraw);
   });
 
   it("Check if [requestWithdraw] and [withdraw] with hold step works good", async function () {
@@ -129,7 +122,7 @@ describe("LiquidStaking", function () {
     await liquidStaking.requestWithdraw(user1,amountToRequestWithdrawAfterUpdateEpoch);
 
     const withdrawForExecutesFirstCheck = await liquidStaking.getWithdrawForExecutes(await user1.getAddress());
-    expect(withdrawForExecutesFirstCheck.stELAOnHoldAmount).equal(toWei(amountToRequestWithdrawBeforeUpdateEpoch));
+    expect(withdrawForExecutesFirstCheck.elaOnHoldAmount).equal(toWei(amountToRequestWithdrawBeforeUpdateEpoch));
 
     const updateEpochAmount = await liquidStaking.getUpdateEpochAmount();
     await owner.sendTransaction({ from: await owner.getAddress(), to: liquidStaking.address, value: updateEpochAmount });
@@ -140,13 +133,10 @@ describe("LiquidStaking", function () {
     await liquidStaking.withdraw(user1, amountToRequestWithdrawBeforeUpdateEpoch);
 
     const withdrawForExecutesSecondCheck = await liquidStaking.getWithdrawForExecutes(await user1.getAddress());
-    expect(withdrawForExecutesSecondCheck.stELAOnHoldAmount).equal(0);
+    expect(withdrawForExecutesSecondCheck.elaOnHoldAmount).equal(0);
 
     const user1AmountAfterWithdraw = await user1.getBalance();
     expect(+user1AmountAfterWithdraw).lessThanOrEqual(+user1AmountBeforeWithdraw.add(toWei(amountToRequestWithdrawBeforeUpdateEpoch)));
-
-    const stElaTotalSupplyAfterWithdraw = await stElaToken.totalSupply();
-    expect(stElaTotalSupplyBeforeWithdraw.sub(toWei(amountToRequestWithdrawBeforeUpdateEpoch))).equal(stElaTotalSupplyAfterWithdraw);
   });
 
   it("Check if [setStElaTransferOwner] works good", async function () {
