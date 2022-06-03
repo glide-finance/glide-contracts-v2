@@ -32,6 +32,7 @@ contract LiquidStaking is ILiquidStaking, Ownable, ReentrancyGuard {
     uint256 public currentEpoch;
     uint256 public totalELAWithdrawRequested;
     uint256 public currentEpochRequestTotal;
+    uint256 public prevEpochRequestTotal;
     uint256 public totalELA;
 
     constructor(
@@ -51,6 +52,7 @@ contract LiquidStaking is ILiquidStaking, Ownable, ReentrancyGuard {
 
     receive() external payable onlyOwner {
         totalELA = totalELA.add(msg.value);
+        prevEpochRequestTotal = totalELA;
 
         emit Fund(msg.sender, msg.value);
     }
@@ -110,17 +112,18 @@ contract LiquidStaking is ILiquidStaking, Ownable, ReentrancyGuard {
         GlideErrors._require(onHold, GlideErrors.STATUS_MUST_BE_ONHOLD);
 
         GlideErrors._require(
-            totalELA >= totalELAWithdrawRequested,
+            prevEpochRequestTotal >= totalELAWithdrawRequested,
             GlideErrors.UPDATE_EPOCH_NOT_ENOUGH_ELA
         );
+        prevEpochRequestTotal = 0;
         onHold = false;
 
         emit EnableWithdraw(totalELAWithdrawRequested);
     }
 
     function getUpdateEpochAmount() external view override returns (uint256) {
-        if (totalELAWithdrawRequested > totalELA) {
-            return totalELAWithdrawRequested.sub(totalELA);
+        if (totalELAWithdrawRequested > prevEpochRequestTotal) {
+            return totalELAWithdrawRequested.sub(prevEpochRequestTotal);
         }
         return 0;
     }
