@@ -128,7 +128,7 @@ contract LiquidStaking is ILiquidStaking, Ownable, ReentrancyGuard {
         return 0;
     }
 
-    function deposit() external payable override {
+    function deposit() external payable override nonReentrant {
         GlideErrors._require(
             bytes(receivePayloadAddress).length != 0,
             GlideErrors.RECEIVE_PAYLOAD_ADDRESS_ZERO
@@ -148,15 +148,13 @@ contract LiquidStaking is ILiquidStaking, Ownable, ReentrancyGuard {
         emit Deposit(msg.sender, msg.value, amountOut);
     }
 
-    function requestWithdraw(uint256 _stELAAmount) external override {
+    function requestWithdraw(uint256 _stELAAmount) external override nonReentrant {
         GlideErrors._require(
             _stELAAmount <= stELA.balanceOf(msg.sender),
             GlideErrors.REQUEST_WITHDRAW_NOT_ENOUGH_AMOUNT
         );
 
         _withdrawRequestToReadyTransfer();
-
-        stELA.burn(msg.sender, _stELAAmount);
 
         uint256 elaAmount = getELAAmountForWithdraw(_stELAAmount);
 
@@ -166,6 +164,8 @@ contract LiquidStaking is ILiquidStaking, Ownable, ReentrancyGuard {
         withdrawRequests[msg.sender].epoch = currentEpoch;
 
         currentEpochRequestTotal = currentEpochRequestTotal.add(elaAmount);
+
+        stELA.burn(msg.sender, _stELAAmount);
 
         emit WithdrawRequest(msg.sender, _stELAAmount, elaAmount);
     }

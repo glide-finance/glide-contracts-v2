@@ -129,7 +129,6 @@ describe("LiquidStaking", function () {
     await liquidStaking.updateEpochSecondStep(owner);
 
     const user1AmountBeforeWithdraw = await user1.getBalance();
-    const stElaTotalSupplyBeforeWithdraw = await stElaToken.totalSupply();
     await liquidStaking.withdraw(user1, amountToRequestWithdrawBeforeUpdateEpoch);
 
     const withdrawForExecutesSecondCheck = await liquidStaking.getWithdrawForExecutes(await user1.getAddress());
